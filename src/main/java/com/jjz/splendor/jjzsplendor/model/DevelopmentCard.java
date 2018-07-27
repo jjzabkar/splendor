@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -38,10 +39,20 @@ public class DevelopmentCard implements Purchasable{
         return whiteCost + blueCost + greenCost + redCost + blackCost;
     }
 
+    public List<GemColor> getTotalGemCost() {
+        List<GemColor> result = new LinkedList<>();
+        for (GemColor g : GemColor.values()){
+            int tot = this.getCostPerColor(g);
+            for(int i = 0; i < tot; i++){
+                result.add(g);
+            }
+        }
+        return result;
+    }
+
     public boolean isPurchaseable(List<GemColor> allColorBuyingPower){
         boolean result = true;
         int goldCount = (int)allColorBuyingPower.stream().filter(x -> x.equals(GemColor.GOLD)).count();
-//        log.warn("TODO: account for goldCount={}" , goldCount);
         for(GemColor g : GemColor.values()){
             int currentCost = getCostPerColor(g);
             int have = (int)allColorBuyingPower.stream().filter(x -> x.equals(g)).count();
@@ -50,7 +61,6 @@ public class DevelopmentCard implements Purchasable{
                 if(goldCount > need){
                     goldCount -= need;
                 }else {
-//                    log.info("not purchaseable because not enough {} for card {}", g, this.toString());
                     return false;
                 }
             }

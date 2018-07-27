@@ -1,17 +1,20 @@
 package com.jjz.splendor.jjzsplendor.players;
 
 import com.jjz.splendor.jjzsplendor.game.Game;
-import com.jjz.splendor.jjzsplendor.model.Action;
+import com.jjz.splendor.jjzsplendor.game.action.*;
 import com.jjz.splendor.jjzsplendor.model.DevelopmentCard;
 import com.jjz.splendor.jjzsplendor.model.GemColor;
 import com.jjz.splendor.jjzsplendor.model.Player;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 
-import javax.smartcardio.Card;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
+
+import static com.jjz.splendor.jjzsplendor.game.action.ActionType.PURCHASE_CARD;
 
 /**
  * Created by jjzabkar on 2018-07-24.
@@ -22,40 +25,69 @@ public class RandomActionStrategy extends Player {
     private Random r = new Random();
 
     @Override
-    public Action play() {
-        int action = r.nextInt(3);
+    public TurnAction play() {
+        ActionType a = ActionType.values()[Math.abs(r.nextInt(ActionType.values().length))];
         boolean canReserveCards = this.getHandCards().size() < 3;
         List<DevelopmentCard> purchaseableCards = this.getGame().getPurchaseableCards(this);
-        Action result = null;
-        if (action == 0) {
-            draw3RandomCoins();
-            result = Action.DRAW_3_COINS;
-        } else if (action == 1) {
-            result = Action.DRAW_2_COINS;
-        } else if (action == 2 && purchaseableCards.size() > 0) {
-            int index = Math.abs(r.nextInt()) % purchaseableCards.size();
-            purchaseCard(purchaseableCards.get(index));
-            result = Action.PURCHASE_CARD;
-        } else if (action == 3 && canReserveCards) {
-            result = Action.RESERVE_CARD;
+        Optional<? extends TurnAction> turnAction = Optional.empty();
+        log.info("player {} will do {}", this.getMyCounter(), a);
+        if(getCoins().size() >= 9 && a.equals(PURCHASE_CARD)){
+            log.info("break");
+        }
+        switch (a) {
+            case DRAW_2_COINS:
+                turnAction = draw2RandomCoins();
+                break;
+            case RESERVE_COMMUNITY_CARD:
+                turnAction = reserveRandomCard(canReserveCards);
+                break;
+            case PURCHASE_CARD:
+                turnAction = purachaseRandomCard(purchaseableCards);
+                break;
+            default:
+                break;
+        }
+        // default: DRAW_3_COINS
+        if (turnAction.isPresent()) {
+            return turnAction.get();
         } else {
-            draw3RandomCoins();
-            result = Action.DRAW_3_COINS;
+            return draw3RandomCoins();
         }
-
-        while (this.getCoins().size() > 10) {
-            int index = r.nextInt(this.getCoins().size());
-            GemColor gem = this.getCoins().remove(index);
-            log.info("player {} discarded a {} coin", this.getMyCounter(), gem);
-            this.getGame().changeGemBankCoinCount(gem, 1);
-        }
-        log.info("player {} action was {}", this.getMyCounter(), result);
-        return result;
     }
 
+    private Optional<PurchaseCardAction> purachaseRandomCard(List<DevelopmentCard> pCards) {
+        if (CollectionUtils.isEmpty(pCards)) {
+            return Optional.empty();
+        } else {
+            int offset = Math.abs(r.nextInt(pCards.size()));
+            return Optional.of(new PurchaseCardAction(this, pCards.get((offset))));
+        }
+    }
 
-    private void draw3RandomCoins() {
-        Game g = super.getGame();
+    private Optional<ReserveCommunityCardAction> reserveRandomCard(boolean canReserveCards) {
+        List<DevelopmentCard> cards = this.getGame().getPurchaseableCommunityCards();
+        if (!canReserveCards || cards.size() == 0)
+            return Optional.empty();
+        return Optional.of(new ReserveCommunityCardAction(this, cards.get(Math.abs(r.nextInt(cards.size() - 1)))));
+    }
+
+    protected Optional<Draw2CoinsAction> draw2RandomCoins() {
+        int s = Math.abs(r.nextInt());
+        for (int i = 0; i < GemColor.values().length; i++) {
+            GemColor g = GemColor.values()[(s + i - 1) % (GemColor.values().length - 1)]; // omit gold
+            if (this.getGame().hasXGemsOfColor(2, g)) {
+                return Optional.of(new Draw2CoinsAction(this, g));
+            }
+        }
+        return Optional.empty();
+    }
+
+    protected Draw3CoinsAction draw3RandomCoins() {
+        List<GemColor> g = get3RandomCoins(super.getGame());
+        return new Draw3CoinsAction(this, g);
+    }
+
+    protected List<GemColor> get3RandomCoins(Game g) {
         GemColor[] gems = new GemColor[5];
         gems[0] = g.getBlackCoins() > 0 ? GemColor.BLACK : null;
         gems[1] = g.getBlueCoins() > 0 ? GemColor.BLUE : null;
@@ -64,7 +96,6 @@ public class RandomActionStrategy extends Player {
         gems[4] = g.getWhiteCoins() > 0 ? GemColor.WHITE : null;
 
         List<GemColor> gemsToDraw = new LinkedList<>();
-
         int colors = 0;
         int offset = Math.abs(r.nextInt());
         for (int i = 0; i < 5 && colors < 3; i++) {
@@ -75,11 +106,6 @@ public class RandomActionStrategy extends Player {
                 colors++;
             }
         }
-
-        for (GemColor gc : gemsToDraw) {
-            this.getGame().changeGemBankCoinCount(gc, -1);
-            log.info("player {} added a {} coin", this.getMyCounter(), gc);
-            super.getCoins().add(gc);
-        }
+        return gemsToDraw;
     }
 }

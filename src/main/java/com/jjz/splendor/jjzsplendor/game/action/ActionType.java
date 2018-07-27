@@ -1,11 +1,11 @@
-package com.jjz.splendor.jjzsplendor.model;
+package com.jjz.splendor.jjzsplendor.game.action;
 
 /**
  * Created by jjzabkar on 2018-07-24.
  */
-public enum Action {
+public enum ActionType {
     DRAW_3_COINS,
     DRAW_2_COINS,
-    RESERVE_CARD,
+    RESERVE_COMMUNITY_CARD,
     PURCHASE_CARD
 }

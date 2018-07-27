@@ -1,21 +1,27 @@
 package com.jjz.splendor.jjzsplendor.game;
 
+import com.google.common.collect.ImmutableList;
+import com.jjz.splendor.jjzsplendor.game.action.PurchaseCardAction;
 import com.jjz.splendor.jjzsplendor.model.DevelopmentCard;
 import com.jjz.splendor.jjzsplendor.model.GemColor;
+import com.jjz.splendor.jjzsplendor.model.Player;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.PostConstruct;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 
-/**
- * Created by jjzabkar on 2018-07-24.
- */
+@AllArgsConstructor
 @Component
 @Slf4j
 public class CardService {
+    private final Random rand = new Random();
+    private final CoinService coinService;
 
     public static final String DEV_CARDS =
             "wc=0&bc=3&gc=0&rc=0&nc=0&pp=0&wf=1&bf=0&gf=0&rf=0&nf=0&lvl=1;" +
@@ -111,11 +117,8 @@ public class CardService {
     public List<DevelopmentCard> getDevelopmentCards() {
         List<DevelopmentCard> result = new LinkedList<>();
         String[] arr = DEV_CARDS.split("\\;");
-//        Assert.isTrue(arr.length == 90, "should be 90 cards, found "+arr.length);
         for (String s : arr) {
-//            log.info("s={}", s);
             String[] tokens = s.split("\\&");
-//            Assert.isTrue(tokens.length==11,"should be 11 tokens: "+s+" found "+tokens.length);
             DevelopmentCard c = new DevelopmentCard();
             for (String token : tokens) {
                 if (token.startsWith("lvl")) {
@@ -152,6 +155,55 @@ public class CardService {
         }
 
         return result;
+    }
+
+    protected void purchaseCard(PurchaseCardAction pca, Game g) {
+        DevelopmentCard card = pca.getCard();
+        Player p = pca.getPlayer();
+        log.info("player {} to purchase {} card worth {} pts: {}", p.getMyCounter(), card.getGem(), card.getPrestigePoints(), card.toString());
+        log.info("player {} has coins {}", p.getMyCounter(), p.getCoins());
+        List<List<DevelopmentCard>> list1 = ImmutableList.of(p.getHandCards(), g.getPurchaseableCommunityCards());
+        for (List<DevelopmentCard> list2 : list1) {
+            list2.remove(card);
+            pca.getPlayer().getPurchasedCards().add(card);
+            if (CollectionUtils.isEmpty(pca.getCoins())) {
+                // take non-wildcards first
+                List<GemColor> totalGemCost = card.getTotalGemCost();
+                coinService.moveCoinsFromPlayerToBankForCardCost(p, totalGemCost);
+                return;
+            } else {
+                throw new RuntimeException("not implemented yet");
+            }
+        }
+    }
+
+    protected void reserveCard(DevelopmentCard card, Player p, Game g) {
+        List<DevelopmentCard> cards = g.getPurchaseableCommunityCards();
+        if (card != null) {
+            if (cards.contains(card)) {
+                cards.remove(card);
+                p.getHandCards().add(card);
+                coinService.moveCoinsFromBankToPlayer(ImmutableList.of(GemColor.GOLD), p, g);
+                replenishCardLevel(g, card.getLevel());
+            } else {
+                Assert.isTrue(false, "expected card to be in community cards: " + card.toString());
+            }
+        }
+    }
+
+    protected void replenishCardLevel(Game g, int level) {
+        int tot = g.getUnseenCards().size();
+        int offset = Math.abs(rand.nextInt(tot));
+        for (int i = 0; i < tot; i++) {
+            DevelopmentCard next = g.getUnseenCards().get((i + offset) % tot);
+            if (next.getLevel() == (level)) {
+                g.getUnseenCards().remove(next);
+                g.getPurchaseableCommunityCards().add(next);
+                log.info("revealed new community card: level={} gem={} pts={}: {}", next.getLevel(), next.getGem(), next.getPrestigePoints(), next.toString());
+                return;
+            }
+        }
+        log.info("unable to replinsh card at level {}", level);
     }
 
     @PostConstruct

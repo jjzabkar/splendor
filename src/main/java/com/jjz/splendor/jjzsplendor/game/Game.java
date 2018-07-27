@@ -11,15 +11,17 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import static com.jjz.splendor.jjzsplendor.game.GameService.END_GAME_PRESTIGE_POINTS;
+import static com.jjz.splendor.jjzsplendor.model.GemColor.*;
+
 /**
  * Created by jjzabkar on 2018-07-24.
  */
 @Data
 @Slf4j
 public class Game {
-    public static int END_GAME_PRESTIGE_POINTS = 1;
     private final List<DevelopmentCard> unseenCards = new LinkedList<>();
-    private final List<DevelopmentCard> purchaseableCards = new LinkedList<>();
+    private final List<DevelopmentCard> purchaseableCommunityCards = new LinkedList<>();
     private final List<Player> players = new LinkedList<>();
     private int round = 0;
     private int whiteCoins = -1;
@@ -28,10 +30,11 @@ public class Game {
     private int redCoins = -1;
     private int blackCoins = -1;
     private int goldCoins = 5;
+    private int startingChips = -1;
 
     public Game(List<Player> p, List<DevelopmentCard> cards) {
         players.addAll(p);
-        int startingChips = 0;
+        startingChips = 0;
         if (players.size() == 2)
             startingChips = 4;
         else if (players.size() == 3)
@@ -47,9 +50,9 @@ public class Game {
         log.info("game will go to {} prestige points", END_GAME_PRESTIGE_POINTS);
         this.unseenCards.addAll(cards);
 
-        this.transfer4CardsOfLevel(1, this.unseenCards, this.purchaseableCards,4);
-        this.transfer4CardsOfLevel(2, this.unseenCards, this.purchaseableCards,8);
-        this.transfer4CardsOfLevel(3, this.unseenCards, this.purchaseableCards,12);
+        this.transfer4CardsOfLevel(1, this.unseenCards, this.purchaseableCommunityCards,4);
+        this.transfer4CardsOfLevel(2, this.unseenCards, this.purchaseableCommunityCards,8);
+        this.transfer4CardsOfLevel(3, this.unseenCards, this.purchaseableCommunityCards,12);
     }
 
     private void transfer4CardsOfLevel(int i, List<DevelopmentCard> unusedCards, List<DevelopmentCard> purchaseableCards, int limit) {
@@ -64,79 +67,37 @@ public class Game {
         }
     }
 
-    /**
-     * @return true if end game condition met
-     */
-    public boolean playRound() {
+    public synchronized int getAndIncrementRound(){
         round++;
-        log.info("play round {}", round);
-        boolean endGame = false;
-        for (Player p : players) {
-            p.play();
-            endGame = checkEndGameCondition();
-            log.info("round {} results: player {} has {} prestige, {} coins, {} development cards, and {} reserved cards",
-                    round, p.getMyCounter(), p.getPrestige(), p.getCoins().size(), p.getPurchasedCards().size(), p.getHandCards().size()
-            );
-            log.info("board has {} cards: {}", this.getPurchaseableCards().size(), this.getPurchaseableCards());
-        }
-        return endGame;
+        return round;
     }
 
-    private boolean checkEndGameCondition() {
-        boolean result = false;
-        for (Player p : players) {
-            int prestigePoints = 0;
-            List<DevelopmentCard> cards = p.getPurchasedCards();
-            for (DevelopmentCard c : cards) {
-                prestigePoints += c.getPrestigePoints();
-            }
-            if (prestigePoints >= END_GAME_PRESTIGE_POINTS) {
-                log.warn("TODO: let round finish");
-                log.info("player {} is the winner",p.getMyCounter());
-                result = true;
-            }
-        }
-
-        return result;
-    }
-
-    public int getBankGems(final GemColor g) {
-        switch (g) {
-            case RED:
-                return redCoins;
-            case BLACK:
-                return blackCoins;
-            case BLUE:
-                return blueCoins;
-            case WHITE:
-                return whiteCoins;
-            case GOLD:
-                return goldCoins;
-            case GREEN:
-                return greenCoins;
-        }
-        return 0;
-    }
-
-    public void changeGemBankCoinCount(GemColor g, int amount) {
+    void changeGemBankCoinCount(GemColor g, int amount) {
+        log.info("change game bank for {} by {}", g, amount);
         switch (g) {
             case RED:
                 redCoins += amount;
+                Assert.isTrue(redCoins >= 0, "cannot have negative");
                 break;
             case BLACK:
                 blackCoins += amount;
+                Assert.isTrue(blackCoins >= 0, "cannot have negative");
                 break;
             case BLUE:
                 blueCoins += amount;
+                Assert.isTrue(blueCoins >= 0, "cannot have negative");
                 break;
             case WHITE:
                 whiteCoins += amount;
+                Assert.isTrue(whiteCoins >= 0, "cannot have negative");
                 break;
             case GOLD:
                 goldCoins += amount;
+                Assert.isTrue(goldCoins >= 0, "cannot have negative");
                 break;
             case GREEN:
                 greenCoins += amount;
+                Assert.isTrue(greenCoins >= 0, "cannot have negative");
                 break;
         }
     }
@@ -144,7 +105,7 @@ public class Game {
     public List<DevelopmentCard> getPurchaseableCards(Player p) {
         List<DevelopmentCard> result = new LinkedList<>();
         List<DevelopmentCard> candidates = new LinkedList(p.getHandCards());
-        candidates.addAll(this.getPurchaseableCards());
+        candidates.addAll(this.getPurchaseableCommunityCards());
         for (DevelopmentCard c : candidates) {
             if (c.isPurchaseable(p.getBuyingPower())) {
                 result.add(c);
@@ -157,19 +118,56 @@ public class Game {
     }
 
     public void removeCardAndReplace(DevelopmentCard card) {
-        Assert.isTrue(this.purchaseableCards.contains(card),"contain");
-        this.purchaseableCards.remove(card);
+        Assert.isTrue(this.purchaseableCommunityCards.contains(card),"contain");
+        this.purchaseableCommunityCards.remove(card);
         int level = card.getLevel();
         Iterator<DevelopmentCard> iterator = this.unseenCards.iterator();
         log.info("card remove from board:", card);
         while(iterator.hasNext()){
             DevelopmentCard next = iterator.next();
             if(next.getLevel()== level){
-                this.purchaseableCards.add(next);
+                this.purchaseableCommunityCards.add(next);
                 this.unseenCards.remove(next);
                 log.info("card added to board:", next);
                 return;
             }
         }
+    }
+
+    public boolean hasXGemsOfColor(int x, GemColor g){
+        switch (g) {
+            case RED:
+                return redCoins >= x;
+            case BLACK:
+                return blackCoins >= x;
+            case BLUE:
+                return blueCoins >= x;
+            case WHITE:
+                return whiteCoins >= x;
+            case GOLD:
+                return goldCoins >= x;
+            case GREEN:
+                return greenCoins >= x;
+        }
+        return false;
+    }
+
+    public List<GemColor> getCoins() {
+        List<GemColor> result = new LinkedList<>();
+        result.addAll(getXCoinsOfColor(redCoins, RED));
+        result.addAll(getXCoinsOfColor(blackCoins, BLACK));
+        result.addAll(getXCoinsOfColor(blueCoins, BLUE));
+        result.addAll(getXCoinsOfColor(whiteCoins, WHITE));
+        result.addAll(getXCoinsOfColor(goldCoins, GOLD));
+        result.addAll(getXCoinsOfColor(greenCoins, GREEN));
+        return result;
+    }
+
+    private List<GemColor> getXCoinsOfColor(int x, GemColor g){
+        List<GemColor> result = new LinkedList<>();
+        for(int i = 0; i < x; i++){
+            result.add(g);
+        }
+        return result;
     }
 }

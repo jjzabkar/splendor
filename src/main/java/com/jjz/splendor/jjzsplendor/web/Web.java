@@ -19,9 +19,9 @@ public class Web {
     @GetMapping("/play")
     public Object play(){
         Game g = gameService.newGame();
-        boolean winner = g.playRound();
+        boolean winner = gameService.playRound(g);
         while(winner ==false){
-            winner = g.playRound();
+            winner = gameService.playRound(g);
         }
         return "done";
     }
