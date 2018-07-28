@@ -118,41 +118,21 @@ public class CardService {
         List<DevelopmentCard> result = new LinkedList<>();
         String[] arr = DEV_CARDS.split("\\;");
         for (String s : arr) {
-            String[] tokens = s.split("\\&");
-            DevelopmentCard c = new DevelopmentCard();
-            for (String token : tokens) {
-                if (token.startsWith("lvl")) {
-                    c.setLevel(Integer.parseInt(token.split("\\=")[1]));
-                } else if (token.startsWith("pp")) {
-                    c.setPrestigePoints(Integer.parseInt(token.split("\\=")[1]));
-
-                } else if (token.equals("wf=1")) {
-                    c.setGem(GemColor.WHITE);
-                } else if (token.equals("bf=1")) {
-                    c.setGem(GemColor.BLUE);
-                } else if (token.equals("gf=1")) {
-                    c.setGem(GemColor.GREEN);
-                } else if (token.equals("rf=1")) {
-                    c.setGem(GemColor.RED);
-                } else if (token.equals("nf=1")) {
-                    c.setGem(GemColor.BLACK);
-
-                } else if (token.startsWith("wc")) {
-                    c.setWhiteCost(Integer.parseInt(token.split("\\=")[1]));
-                } else if (token.startsWith("bc")) {
-                    c.setBlueCost(Integer.parseInt(token.split("\\=")[1]));
-                } else if (token.startsWith("gc")) {
-                    c.setGreenCost(Integer.parseInt(token.split("\\=")[1]));
-                } else if (token.startsWith("rc")) {
-                    c.setRedCost(Integer.parseInt(token.split("\\=")[1]));
-                } else if (token.startsWith("nc")) {
-                    c.setBlackCost(Integer.parseInt(token.split("\\=")[1]));
-                }
-
-            }
-
-            result.add(c);
+            result.add(new DevelopmentCard(s));
         }
+
+        log.info("shuffling...");
+        DevelopmentCard tmp;
+        for(int i = 0; i < (result.size()*7)+Math.abs(rand.nextInt(5111));i++) {
+            int randSpot1 = Math.abs(rand.nextInt(result.size()));
+            int randSpot2 = Math.abs(rand.nextInt(result.size()));
+            if(randSpot1 != randSpot2){
+                tmp = result.get(randSpot1);
+                result.set(randSpot1, result.get(randSpot2));
+                result.set(randSpot2, tmp);
+            }
+        }
+        log.info("shuffle complete");
 
         return result;
     }
@@ -161,7 +141,12 @@ public class CardService {
         DevelopmentCard card = pca.getCard();
         Player p = pca.getPlayer();
         log.info("player {} to purchase {} card worth {} pts: {}", p.getMyCounter(), card.getGem(), card.getPrestigePoints(), card.toString());
-        log.info("player {} has coins {}", p.getMyCounter(), p.getCoins());
+        log.info("player {} has {} coins {}", p.getMyCounter(), p.getCoins().size(), p.getCoins());
+        log.info("player {} has {} purchased cards: ", p.getMyCounter(), p.getPurchasedCards().size());
+        for(DevelopmentCard c : p.getPurchasedCards()){
+            log.info("\t {} \t{} \t {}", c.getGem(), c.getPrestigePoints(), c);
+        }
+
         List<List<DevelopmentCard>> list1 = ImmutableList.of(p.getHandCards(), g.getPurchaseableCommunityCards());
         for (List<DevelopmentCard> list2 : list1) {
             list2.remove(card);

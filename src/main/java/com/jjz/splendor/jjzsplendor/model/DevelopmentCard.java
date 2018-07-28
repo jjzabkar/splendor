@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.Assert;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -17,7 +18,7 @@ import java.util.List;
 @NoArgsConstructor
 @Data
 @Slf4j
-public class DevelopmentCard implements Purchasable{
+public class DevelopmentCard implements Purchasable {
     /**
      * the color of the card; used for future discounts.
      */
@@ -35,32 +36,70 @@ public class DevelopmentCard implements Purchasable{
     private int redCost;
     private int blackCost;
 
-    public int getTotalCost(){
+    /**
+     * @param s - parseable string, eg: wc=3&bc=3&gc=5&rc=3&nc=0&pp=3&wf=0&bf=0&gf=0&rf=0&nf=1&lvl=3
+     */
+    public DevelopmentCard(String s) {
+        String[] tokens = s.split("\\&");
+        for (String token : tokens) {
+            if (token.startsWith("lvl")) {
+                this.setLevel(Integer.parseInt(token.split("\\=")[1]));
+            } else if (token.startsWith("pp")) {
+                this.setPrestigePoints(Integer.parseInt(token.split("\\=")[1]));
+
+            } else if (token.equals("wf=1")) {
+                this.setGem(GemColor.WHITE);
+            } else if (token.equals("bf=1")) {
+                this.setGem(GemColor.BLUE);
+            } else if (token.equals("gf=1")) {
+                this.setGem(GemColor.GREEN);
+            } else if (token.equals("rf=1")) {
+                this.setGem(GemColor.RED);
+            } else if (token.equals("nf=1")) {
+                this.setGem(GemColor.BLACK);
+
+            } else if (token.startsWith("wc")) {
+                this.setWhiteCost(Integer.parseInt(token.split("\\=")[1]));
+            } else if (token.startsWith("bc")) {
+                this.setBlueCost(Integer.parseInt(token.split("\\=")[1]));
+            } else if (token.startsWith("gc")) {
+                this.setGreenCost(Integer.parseInt(token.split("\\=")[1]));
+            } else if (token.startsWith("rc")) {
+                this.setRedCost(Integer.parseInt(token.split("\\=")[1]));
+            } else if (token.startsWith("nc")) {
+                this.setBlackCost(Integer.parseInt(token.split("\\=")[1]));
+            }
+        }
+        Assert.isTrue(this.getGem() != null, "gem color required: "+s);
+        Assert.isTrue(this.getTotalCost() > 2,"expected cost > 2");
+    }
+
+    public int getTotalCost() {
         return whiteCost + blueCost + greenCost + redCost + blackCost;
     }
 
     public List<GemColor> getTotalGemCost() {
         List<GemColor> result = new LinkedList<>();
-        for (GemColor g : GemColor.values()){
+        for (GemColor g : GemColor.values()) {
             int tot = this.getCostPerColor(g);
-            for(int i = 0; i < tot; i++){
+            for (int i = 0; i < tot; i++) {
                 result.add(g);
             }
         }
         return result;
     }
 
-    public boolean isPurchaseable(List<GemColor> allColorBuyingPower){
+    public boolean isPurchaseable(List<GemColor> allColorBuyingPower) {
         boolean result = true;
-        int goldCount = (int)allColorBuyingPower.stream().filter(x -> x.equals(GemColor.GOLD)).count();
-        for(GemColor g : GemColor.values()){
+        int goldCount = (int) allColorBuyingPower.stream().filter(x -> x.equals(GemColor.GOLD)).count();
+        for (GemColor g : GemColor.values()) {
             int currentCost = getCostPerColor(g);
-            int have = (int)allColorBuyingPower.stream().filter(x -> x.equals(g)).count();
-            if (have < currentCost){
+            int have = (int) allColorBuyingPower.stream().filter(x -> x.equals(g)).count();
+            if (have < currentCost) {
                 int need = currentCost - have;
-                if(goldCount > need){
+                if (goldCount > need) {
                     goldCount -= need;
-                }else {
+                } else {
                     return false;
                 }
             }
@@ -68,7 +107,7 @@ public class DevelopmentCard implements Purchasable{
         return result;
     }
 
-    public int getCostPerColor(GemColor g){
+    public int getCostPerColor(GemColor g) {
         switch (g) {
             case RED:
                 return redCost;

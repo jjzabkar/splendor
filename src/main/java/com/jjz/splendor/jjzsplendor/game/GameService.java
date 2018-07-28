@@ -9,12 +9,10 @@ import com.jjz.splendor.jjzsplendor.players.RandomActionStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.util.Assert;
 
 import javax.annotation.PostConstruct;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 
 /**
  * Created by jjzabkar on 2018-07-24.
@@ -23,10 +21,9 @@ import java.util.Random;
 @Component
 @Slf4j
 public class GameService {
-    public static int END_GAME_PRESTIGE_POINTS = 10;
+    public static int END_GAME_PRESTIGE_POINTS = 15;
     private final CardService cardService;
     private final CoinService coinService;
-    private final Random rand = new Random();
 
     @PostConstruct
     public void postConstruct() throws InterruptedException {
@@ -36,7 +33,6 @@ public class GameService {
             winner = playRound(g);
         }
     }
-
 
     public Game newGame() {
         Player p1 = new RandomActionStrategy();
@@ -109,6 +105,7 @@ public class GameService {
      */
     public boolean checkEndGameCondition(final Game g) {
         boolean result = false;
+        int winnerCount = 0;
         for (Player p : g.getPlayers()) {
             int prestigePoints = 0;
             List<DevelopmentCard> cards = p.getPurchasedCards();
@@ -119,7 +116,11 @@ public class GameService {
                 log.warn("TODO: let round finish");
                 log.info("player {} is the winner", p.getMyCounter());
                 result = true;
+                winnerCount++;
             }
+        }
+        if (winnerCount > 1) {
+            throw new RuntimeException("TODO: add tiebreak logic");
         }
 
         return result;
