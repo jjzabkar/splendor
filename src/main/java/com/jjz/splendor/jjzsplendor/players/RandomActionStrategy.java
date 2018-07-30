@@ -31,9 +31,6 @@ public class RandomActionStrategy extends Player {
         List<DevelopmentCard> purchaseableCards = this.getGame().getPurchaseableCards(this);
         Optional<? extends TurnAction> turnAction = Optional.empty();
         log.info("player {} will do {}", this.getMyCounter(), a);
-        if(getCoins().size() >= 9 && a.equals(PURCHASE_CARD)){
-            log.info("break");
-        }
         switch (a) {
             case DRAW_2_COINS:
                 turnAction = draw2RandomCoins();

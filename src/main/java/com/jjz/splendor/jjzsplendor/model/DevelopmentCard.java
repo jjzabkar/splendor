@@ -1,9 +1,7 @@
 package com.jjz.splendor.jjzsplendor.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.Assert;
 
@@ -13,12 +11,11 @@ import java.util.List;
 /**
  * Created by jjzabkar on 2018-07-24.
  */
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
 @Data
 @Slf4j
+@EqualsAndHashCode(of = {"id", "gem", "level", "whiteCost", "blueCost", "greenCost", "redCost", "blackCost"})
 public class DevelopmentCard implements Purchasable {
+    private final int id;
     /**
      * the color of the card; used for future discounts.
      */
@@ -39,11 +36,18 @@ public class DevelopmentCard implements Purchasable {
     /**
      * @param s - parseable string, eg: wc=3&bc=3&gc=5&rc=3&nc=0&pp=3&wf=0&bf=0&gf=0&rf=0&nf=1&lvl=3
      */
-    public DevelopmentCard(String s) {
+    public DevelopmentCard(int id, String s) {
+        this.id = id;
         String[] tokens = s.split("\\&");
+        boolean isNoble = false;
         for (String token : tokens) {
             if (token.startsWith("lvl")) {
-                this.setLevel(Integer.parseInt(token.split("\\=")[1]));
+                String value = token.split("\\=")[1];
+                if (value.equals("Noble")) {
+                    isNoble = true;
+                } else {
+                    this.setLevel(Integer.parseInt(value));
+                }
             } else if (token.startsWith("pp")) {
                 this.setPrestigePoints(Integer.parseInt(token.split("\\=")[1]));
 
@@ -70,8 +74,10 @@ public class DevelopmentCard implements Purchasable {
                 this.setBlackCost(Integer.parseInt(token.split("\\=")[1]));
             }
         }
-        Assert.isTrue(this.getGem() != null, "gem color required: "+s);
-        Assert.isTrue(this.getTotalCost() > 2,"expected cost > 2");
+        if (!isNoble) {
+            Assert.isTrue(this.getGem() != null, "gem color required: " + s);
+        }
+        Assert.isTrue(this.getTotalCost() > 2, "expected cost > 2");
     }
 
     public int getTotalCost() {
@@ -91,10 +97,10 @@ public class DevelopmentCard implements Purchasable {
 
     public boolean isPurchaseable(List<GemColor> allColorBuyingPower) {
         boolean result = true;
-        int goldCount = (int) allColorBuyingPower.stream().filter(x -> x.equals(GemColor.GOLD)).count();
+        int goldCount = (int) allColorBuyingPower.stream().filter(x -> x != null && x.equals(GemColor.GOLD)).count();
         for (GemColor g : GemColor.values()) {
             int currentCost = getCostPerColor(g);
-            int have = (int) allColorBuyingPower.stream().filter(x -> x.equals(g)).count();
+            int have = (int) allColorBuyingPower.stream().filter(x -> x != null && x.equals(g)).count();
             if (have < currentCost) {
                 int need = currentCost - have;
                 if (goldCount > need) {

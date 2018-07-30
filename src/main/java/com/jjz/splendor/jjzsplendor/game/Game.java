@@ -2,6 +2,7 @@ package com.jjz.splendor.jjzsplendor.game;
 
 import com.jjz.splendor.jjzsplendor.model.DevelopmentCard;
 import com.jjz.splendor.jjzsplendor.model.GemColor;
+import com.jjz.splendor.jjzsplendor.model.Noble;
 import com.jjz.splendor.jjzsplendor.model.Player;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import static com.jjz.splendor.jjzsplendor.model.GemColor.*;
 public class Game {
     private final List<DevelopmentCard> unseenCards = new LinkedList<>();
     private final List<DevelopmentCard> purchaseableCommunityCards = new LinkedList<>();
+    private final List<Noble> nobles = new LinkedList<>();
     private final List<Player> players = new LinkedList<>();
     private int round = 0;
     private int whiteCoins = -1;
@@ -32,7 +34,7 @@ public class Game {
     private int goldCoins = 5;
     private int startingChips = -1;
 
-    public Game(List<Player> p, List<DevelopmentCard> cards) {
+    public Game(List<Player> p, List<DevelopmentCard> cards, List<Noble> nobles) {
         players.addAll(p);
         startingChips = 0;
         if (players.size() == 2)
@@ -49,6 +51,7 @@ public class Game {
         log.info("starting game with {} players and {} chips", players.size(), startingChips);
         log.info("game will go to {} prestige points", END_GAME_PRESTIGE_POINTS);
         this.unseenCards.addAll(cards);
+        this.nobles.addAll(nobles);
 
         this.transfer4CardsOfLevel(1, this.unseenCards, this.purchaseableCommunityCards,4);
         this.transfer4CardsOfLevel(2, this.unseenCards, this.purchaseableCommunityCards,8);
@@ -73,7 +76,7 @@ public class Game {
     }
 
     void changeGemBankCoinCount(GemColor g, int amount) {
-        log.info("change game bank for {} by {}", g, amount);
+        log.debug("change game bank for {} by {}", g, amount);
         switch (g) {
             case RED:
                 redCoins += amount;

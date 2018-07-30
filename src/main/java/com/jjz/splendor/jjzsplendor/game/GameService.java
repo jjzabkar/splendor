@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.jjz.splendor.jjzsplendor.game.action.*;
 import com.jjz.splendor.jjzsplendor.model.DevelopmentCard;
 import com.jjz.splendor.jjzsplendor.model.GemColor;
+import com.jjz.splendor.jjzsplendor.model.Noble;
 import com.jjz.splendor.jjzsplendor.model.Player;
 import com.jjz.splendor.jjzsplendor.players.RandomActionStrategy;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class GameService {
     public static int END_GAME_PRESTIGE_POINTS = 15;
     private final CardService cardService;
     private final CoinService coinService;
+    private final NobleService nobleService;
 
     @PostConstruct
     public void postConstruct() throws InterruptedException {
@@ -31,6 +33,7 @@ public class GameService {
         boolean winner = playRound(g);
         while (winner == false) {
             winner = playRound(g);
+            Thread.sleep(100);
         }
     }
 
@@ -39,7 +42,8 @@ public class GameService {
         Player p2 = new RandomActionStrategy();
         List<Player> players = ImmutableList.of(p1, p2);
         List<DevelopmentCard> cards = cardService.getDevelopmentCards();
-        Game g = new Game(players, cards);
+        List<Noble> nobles = nobleService.getNobles();
+        Game g = new Game(players, cards, nobles);
         for (Player p : players) {
             p.setGame(g);
         }
@@ -63,6 +67,7 @@ public class GameService {
                     break;
                 case RESERVE_COMMUNITY_CARD:
                     ReserveCommunityCardAction rca = (ReserveCommunityCardAction) action;
+                    log.warn("TODO: add ability to reserve unseen card");
                     cardService.reserveCard(rca.getCard(), p, g);
                     break;
                 case DRAW_2_COINS:
@@ -84,20 +89,22 @@ public class GameService {
 
             coinService.checkPlayerOverLimit(p, discardCoins, g);
 
-            checkNoble(p, g);
+            nobleService.checkVisitFromNoble(p, g);
 
             log.info("round {} results: player {} has {} prestige, {} development cards, {} reserved cards, and {} coins: {}",
                     round, p.getMyCounter(), p.getPrestige(), p.getPurchasedCards().size(), p.getHandCards().size(), p.getCoins().size(), p.getCoins()
             );
-            log.info("board has {} cards: {}", g.getPurchaseableCommunityCards().size(), g.getPurchaseableCommunityCards());
-            log.info("board has {} coins: {}", g.getCoins().size(), g.getCoins());
+            log.info("board has {} cards:  {}", g.getPurchaseableCommunityCards().size(), g.getPurchaseableCommunityCards());
+            log.info("board has {} coins:  {}", g.getCoins().size(), g.getCoins());
+            log.info("board has {} nobles: {}", g.getNobles().size(), g.getNobles());
+
+            coinService.validateCoinCounts(g);
+            cardService.validateCardCounts(g);
         }
         coinService.validateCoinCounts(g);
-        return endGame;
-    }
+        cardService.validateCardCounts(g);
 
-    private void checkNoble(Player p, Game g) {
-        log.warn("TODO: CHECK VISIT FROM NOBLE");
+        return endGame;
     }
 
     /**

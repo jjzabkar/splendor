@@ -1,5 +1,6 @@
 package com.jjz.splendor.jjzsplendor.model;
 
+import com.google.common.collect.ImmutableList;
 import com.jjz.splendor.jjzsplendor.game.Game;
 import com.jjz.splendor.jjzsplendor.game.action.TurnAction;
 import lombok.Getter;
@@ -71,5 +72,10 @@ public abstract class Player {
 
     }
 
-
+    public ImmutableList<DevelopmentCard> getAllCards(){
+        return ImmutableList.<DevelopmentCard>builder()
+                .addAll(this.getHandCards())
+                .addAll(this.getPurchasedCards())
+                .build();
+    }
 }

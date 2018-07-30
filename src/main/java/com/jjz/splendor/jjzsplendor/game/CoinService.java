@@ -62,7 +62,7 @@ public class CoinService {
     }
 
     protected void changeGameCoinCount(Game game, GemColor g, int i) {
-        log.info("change game coin count: {} {}{}",g ,(i > 0? "+": ""), i);
+        log.debug("change game coin count: {} {}{}",g ,(i > 0? "+": ""), i);
         log.debug("\t before: {}", game.getCoins());
         switch(g){
             case RED:
@@ -111,17 +111,19 @@ public class CoinService {
     }
 
     public void moveCoinsFromPlayerToBankForCardCost(final Player p, final List<GemColor> srcTotalGemCost) {
-        log.info("player {} to spend: {}", p.getMyCounter(), srcTotalGemCost);
+        log.info("player {} to spend {}: {}", p.getMyCounter(), srcTotalGemCost.size(), srcTotalGemCost);
         List<GemColor> totalGemCost = new LinkedList<>(srcTotalGemCost);
         List<GemColor> playerCoins = p.getCoins();
         log.debug("player {} has     : {}", p.getMyCounter(), p.getCoins());
         // apply discount
         log.debug("before discount cost is {}", totalGemCost);
+        int appliedDiscounts = 0;
         for(DevelopmentCard c: p.getPurchasedCards()){
-            log.debug("\t discount: {}", c.getGem());
+            log.info("\t discount: {}", c.getGem());
             this.removeCoinFromCollecton(totalGemCost, c.getGem());
+            appliedDiscounts++;
         }
-        log.info("player {} has discounts: {}", p.getMyCounter(), totalGemCost);
+        log.info("player {} has {} discounts; revised cost is {}: {}", p.getMyCounter(), appliedDiscounts, totalGemCost.size(), totalGemCost);
         int before = playerCoins.size();
         //TODO: check first
         for (GemColor g : totalGemCost) {
@@ -132,7 +134,7 @@ public class CoinService {
     }
 
     private GemColor removeCoin(List<GemColor> playerCoins, GemColor g, Game game) {
-        log.info("remove coin {} from playercoins ({})", g, playerCoins);
+        log.debug("remove coin {} from playercoins ({})", g, playerCoins);
         GemColor result = removeCoinFromCollecton(playerCoins, g);
         if(result != null){
             this.changeGameCoinCount(game, result, 1);
@@ -153,9 +155,9 @@ public class CoinService {
      */
     public GemColor removeCoinFromCollecton(List<GemColor> list, GemColor toRemove){
         Iterator<GemColor> iterator = list.iterator();
-        while (iterator.hasNext()) {
+        while (toRemove != null && iterator.hasNext()) {
             GemColor next = iterator.next();
-            if (toRemove.equals(next)) {
+            if (next != null && toRemove.equals(next)) {
                 list.remove(next);
                 log.debug("\t remove coin {}", toRemove);
                 return toRemove;

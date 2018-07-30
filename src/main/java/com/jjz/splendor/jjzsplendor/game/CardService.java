@@ -2,26 +2,32 @@ package com.jjz.splendor.jjzsplendor.game;
 
 import com.google.common.collect.ImmutableList;
 import com.jjz.splendor.jjzsplendor.game.action.PurchaseCardAction;
-import com.jjz.splendor.jjzsplendor.model.DevelopmentCard;
-import com.jjz.splendor.jjzsplendor.model.GemColor;
-import com.jjz.splendor.jjzsplendor.model.Player;
+import com.jjz.splendor.jjzsplendor.model.*;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.PostConstruct;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
-@AllArgsConstructor
 @Component
 @Slf4j
 public class CardService {
-    private final Random rand = new Random();
+    private final Random rand;
     private final CoinService coinService;
+    @Getter
+    public int cardCount;
+
+    @Autowired
+    public CardService(CoinService coinService) {
+        this.coinService = coinService;
+        this.cardCount = -1;
+        this.rand = new Random();
+    }
 
     public static final String DEV_CARDS =
             "wc=0&bc=3&gc=0&rc=0&nc=0&pp=0&wf=1&bf=0&gf=0&rf=0&nf=0&lvl=1;" +
@@ -117,49 +123,63 @@ public class CardService {
     public List<DevelopmentCard> getDevelopmentCards() {
         List<DevelopmentCard> result = new LinkedList<>();
         String[] arr = DEV_CARDS.split("\\;");
+        int i = 0;
         for (String s : arr) {
-            result.add(new DevelopmentCard(s));
+            result.add(new DevelopmentCard(i++, s));
         }
+        shuffle(result);
+        this.cardCount = result.size();
+        return result;
+    }
 
+    public <T extends Object> void shuffle(List<T> result) {
         log.info("shuffling...");
-        DevelopmentCard tmp;
-        for(int i = 0; i < (result.size()*7)+Math.abs(rand.nextInt(5111));i++) {
+        T tmp;
+        for (int i = 0; i < (result.size() * 7) + Math.abs(rand.nextInt(5111)); i++) {
             int randSpot1 = Math.abs(rand.nextInt(result.size()));
             int randSpot2 = Math.abs(rand.nextInt(result.size()));
-            if(randSpot1 != randSpot2){
+            if (randSpot1 != randSpot2) {
                 tmp = result.get(randSpot1);
                 result.set(randSpot1, result.get(randSpot2));
                 result.set(randSpot2, tmp);
             }
         }
         log.info("shuffle complete");
-
-        return result;
     }
 
     protected void purchaseCard(PurchaseCardAction pca, Game g) {
-        DevelopmentCard card = pca.getCard();
-        Player p = pca.getPlayer();
+        this.purchaseCard(pca.getCard(), pca.getPlayer(), g, pca.getCoins());
+    }
+
+    protected void purchaseCard(DevelopmentCard card, Player p, Game g, List<GemColor> coins) {
         log.info("player {} to purchase {} card worth {} pts: {}", p.getMyCounter(), card.getGem(), card.getPrestigePoints(), card.toString());
         log.info("player {} has {} coins {}", p.getMyCounter(), p.getCoins().size(), p.getCoins());
         log.info("player {} has {} purchased cards: ", p.getMyCounter(), p.getPurchasedCards().size());
-        for(DevelopmentCard c : p.getPurchasedCards()){
+        for (DevelopmentCard c : p.getPurchasedCards()) {
             log.info("\t {} \t{} \t {}", c.getGem(), c.getPrestigePoints(), c);
         }
-
-        List<List<DevelopmentCard>> list1 = ImmutableList.of(p.getHandCards(), g.getPurchaseableCommunityCards());
-        for (List<DevelopmentCard> list2 : list1) {
-            list2.remove(card);
-            pca.getPlayer().getPurchasedCards().add(card);
-            if (CollectionUtils.isEmpty(pca.getCoins())) {
-                // take non-wildcards first
-                List<GemColor> totalGemCost = card.getTotalGemCost();
-                coinService.moveCoinsFromPlayerToBankForCardCost(p, totalGemCost);
+        List<List<? extends Purchasable>> list1 = ImmutableList.of(p.getHandCards(), g.getPurchaseableCommunityCards());
+        if (card instanceof Noble) {
+            list1 = ImmutableList.of(g.getNobles());
+        }
+        for (List<? extends Purchasable> list2 : list1) {
+            if (list2.contains(card)) {
+                list2.remove(card);
+                p.getPurchasedCards().add(card);
+                if (!(card instanceof Noble)) {
+                    Optional<DevelopmentCard> replenished = this.replenishCardLevel(g, card.getLevel());
+                }
+                if (CollectionUtils.isEmpty(coins)) {
+                    // automatically figure out which coins to take, taking non-wildcards first
+                    List<GemColor> totalGemCost = card.getTotalGemCost();
+                    coinService.moveCoinsFromPlayerToBankForCardCost(p, totalGemCost);
+                } else {
+                    throw new RuntimeException("not implemented yet");
+                }
                 return;
-            } else {
-                throw new RuntimeException("not implemented yet");
             }
         }
+        throw new IllegalStateException("card should have been found in list and purchased");
     }
 
     protected void reserveCard(DevelopmentCard card, Player p, Game g) {
@@ -168,31 +188,64 @@ public class CardService {
             if (cards.contains(card)) {
                 cards.remove(card);
                 p.getHandCards().add(card);
-                coinService.moveCoinsFromBankToPlayer(ImmutableList.of(GemColor.GOLD), p, g);
                 replenishCardLevel(g, card.getLevel());
+                if (g.getGoldCoins() > 0) {
+                    coinService.moveCoinsFromBankToPlayer(ImmutableList.of(GemColor.GOLD), p, g);
+                }
             } else {
                 Assert.isTrue(false, "expected card to be in community cards: " + card.toString());
             }
         }
     }
 
-    protected void replenishCardLevel(Game g, int level) {
+    protected Optional<DevelopmentCard> replenishCardLevel(Game g, int level) {
         int tot = g.getUnseenCards().size();
-        int offset = Math.abs(rand.nextInt(tot));
+//        int offset = Math.abs(rand.nextInt(tot));
         for (int i = 0; i < tot; i++) {
-            DevelopmentCard next = g.getUnseenCards().get((i + offset) % tot);
+//            int index =
+            DevelopmentCard next = g.getUnseenCards().get((i));
             if (next.getLevel() == (level)) {
-                g.getUnseenCards().remove(next);
-                g.getPurchaseableCommunityCards().add(next);
+                DevelopmentCard newCard = g.getUnseenCards().remove(i);
+                g.getPurchaseableCommunityCards().add(newCard);
                 log.info("revealed new community card: level={} gem={} pts={}: {}", next.getLevel(), next.getGem(), next.getPrestigePoints(), next.toString());
-                return;
+                return Optional.of(next);
             }
         }
-        log.info("unable to replinsh card at level {}", level);
+        log.info("unable to replenish card at level {}", level);
+        return Optional.empty();
     }
 
-    @PostConstruct
-    public void postConstruct() {
-        this.getDevelopmentCards();
+    public void validateCardCounts(Game g) {
+        List<DevelopmentCard> allCards = new LinkedList<>(g.getPurchaseableCommunityCards());
+        List<Noble> allNobles = new LinkedList<>(g.getNobles());
+        allCards.addAll(g.getUnseenCards());
+        Set<Integer> allCardIds = new HashSet<>();
+        for (Player p : g.getPlayers()) {
+            for (DevelopmentCard c : p.getAllCards()) {
+                if (!(c instanceof Noble)) {
+                    allCards.add(c);
+                }
+            }
+        }
+        for (DevelopmentCard c : allCards) {
+            if (allCardIds.contains(c.getId())) {
+                throw new IllegalStateException("card " + c.getId() + " found twice: " + c);
+            } else {
+                allCardIds.add(c.getId());
+            }
+        }
+        allCardIds.clear();
+        for (Noble n : allNobles) {
+            if (allCardIds.contains(n.getId())) {
+                throw new IllegalStateException("noble " + n.getId() + " found twice: " + n);
+            } else {
+                allCardIds.add(n.getId());
+            }
+        }
+
+        int pcc = g.getPurchaseableCommunityCards().size();
+        if (pcc > 12) {
+            throw new IllegalStateException("board has exceeded 12 cards: " + pcc + " found");
+        }
     }
 }
