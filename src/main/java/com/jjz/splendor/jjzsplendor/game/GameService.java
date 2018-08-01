@@ -33,14 +33,15 @@ public class GameService {
         boolean winner = playRound(g);
         while (winner == false) {
             winner = playRound(g);
-            Thread.sleep(100);
+//            Thread.sleep(100);
         }
     }
 
     public Game newGame() {
         Player p1 = new RandomActionStrategy();
         Player p2 = new RandomActionStrategy();
-        List<Player> players = ImmutableList.of(p1, p2);
+        Player p3 = new RandomActionStrategy();
+        List<Player> players = ImmutableList.of(p1, p2, p3);
         List<DevelopmentCard> cards = cardService.getDevelopmentCards();
         List<Noble> nobles = nobleService.getNobles();
         Game g = new Game(players, cards, nobles);
@@ -56,6 +57,12 @@ public class GameService {
     public boolean playRound(final Game g) {
         int round = g.getAndIncrementRound();
         log.info("play round {}", round);
+        if (round > 150) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) { }
+//            throw new RuntimeException("something went wrong. game should have finished before round 100");
+        }
         boolean endGame = false;
         for (Player p : g.getPlayers()) {
             TurnAction action = p.play();
@@ -91,12 +98,35 @@ public class GameService {
 
             nobleService.checkVisitFromNoble(p, g);
 
-            log.info("round {} results: player {} has {} prestige, {} development cards, {} reserved cards, and {} coins: {}",
-                    round, p.getMyCounter(), p.getPrestige(), p.getPurchasedCards().size(), p.getHandCards().size(), p.getCoins().size(), p.getCoins()
+            log.info("\n");
+            log.info("round {}-{} results: player {} has {} prestige, {} development cards, {} reserved cards, and {} coins: {}",
+                    round, p.getMyCounter(), p.getMyCounter(), p.getPrestige(), p.getPurchasedCards().size(), p.getHandCards().size(), p.getCoins().size(), p.getCoins()
             );
+            for (Player p2 : g.getPlayers()) {
+                log.info("player {} has:", p2.getMyCounter());
+                log.info("\t {} prestige points", p2.getPrestige());
+                log.info("\t {} coins:", p2.getCoins().size());
+                        log.info("\t\t {}", p2.getCoins());
+                log.info("\t {} purchased cards:", p2.getPurchasedCards().size());
+                for (DevelopmentCard c : p2.getPurchasedCards()) {
+                    log.info("\t\t {}", c);
+                }
+                log.info("\t {} reserved cards in hand:", p2.getHandCards().size());
+                for (DevelopmentCard c : p2.getHandCards()) {
+                    log.info("\t\t {}", c);
+                }
+            }
             log.info("board has {} cards:  {}", g.getPurchaseableCommunityCards().size(), g.getPurchaseableCommunityCards());
+            for (DevelopmentCard c : g.getPurchaseableCommunityCards()) {
+                log.info("\t {}", c);
+            }
             log.info("board has {} coins:  {}", g.getCoins().size(), g.getCoins());
             log.info("board has {} nobles: {}", g.getNobles().size(), g.getNobles());
+            log.info("PurchaseableCommunityCards:");
+            for (Noble c : g.getNobles()) {
+                log.info("\t {}", c);
+            }
+            log.info("\n\n");
 
             coinService.validateCoinCounts(g);
             cardService.validateCardCounts(g);

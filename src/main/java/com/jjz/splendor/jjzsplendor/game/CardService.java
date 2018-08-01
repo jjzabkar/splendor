@@ -166,7 +166,7 @@ public class CardService {
             if (list2.contains(card)) {
                 list2.remove(card);
                 p.getPurchasedCards().add(card);
-                if (!(card instanceof Noble)) {
+                if (!(card instanceof Noble) && g.getPurchaseableCommunityCards().contains(card)) {
                     Optional<DevelopmentCard> replenished = this.replenishCardLevel(g, card.getLevel());
                 }
                 if (CollectionUtils.isEmpty(coins)) {
@@ -245,6 +245,10 @@ public class CardService {
 
         int pcc = g.getPurchaseableCommunityCards().size();
         if (pcc > 12) {
+            log.info("PurchaseableCommunityCards:");
+            for(DevelopmentCard c: g.getPurchaseableCommunityCards()){
+                log.info("\t {}",c);
+            }
             throw new IllegalStateException("board has exceeded 12 cards: " + pcc + " found");
         }
     }
