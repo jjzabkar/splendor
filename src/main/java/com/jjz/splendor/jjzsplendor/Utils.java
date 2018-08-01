@@ -3,6 +3,7 @@ package com.jjz.splendor.jjzsplendor;
 import com.jjz.splendor.jjzsplendor.model.DevelopmentCard;
 import com.jjz.splendor.jjzsplendor.model.GemColor;
 
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -22,4 +23,23 @@ public class Utils {
         }
         return result;
     }
+
+    public static List<GemColor> getGemCostAfterDiscountGivenBuyingPower(List<GemColor> inputBuyingPower, DevelopmentCard card) {
+        List<GemColor> cost = card.getTotalGemCost();
+        LinkedList<GemColor> buyingPower = new LinkedList(inputBuyingPower);
+        List<GemColor> result = new LinkedList<>(cost);
+        for (GemColor gem : buyingPower) {
+            if (result.contains(gem)) {
+                result.remove(gem);
+            }
+        }
+        // now remove gold
+        for (GemColor gem : buyingPower) {
+            if (gem != null && result != null && gem.equals(GemColor.GOLD) && !result.isEmpty()) {
+                result.remove(0);
+            }
+        }
+        return result;
+    }
+
 }

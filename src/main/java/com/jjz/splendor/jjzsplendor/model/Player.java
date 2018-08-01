@@ -78,4 +78,8 @@ public abstract class Player {
                 .addAll(this.getPurchasedCards())
                 .build();
     }
+
+    public List<DevelopmentCard> getPurchaseableCards(){
+        return this.getGame().getPurchaseableCards(this);
+    }
 }

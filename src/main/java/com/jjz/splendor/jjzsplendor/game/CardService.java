@@ -200,9 +200,7 @@ public class CardService {
 
     protected Optional<DevelopmentCard> replenishCardLevel(Game g, int level) {
         int tot = g.getUnseenCards().size();
-//        int offset = Math.abs(rand.nextInt(tot));
         for (int i = 0; i < tot; i++) {
-//            int index =
             DevelopmentCard next = g.getUnseenCards().get((i));
             if (next.getLevel() == (level)) {
                 DevelopmentCard newCard = g.getUnseenCards().remove(i);

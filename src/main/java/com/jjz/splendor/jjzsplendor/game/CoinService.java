@@ -53,8 +53,12 @@ public class CoinService {
         synchronized (player) {
             synchronized (game) {
                 for (GemColor g : bankCoinsToPlayer) {
-                    this.changePlayerCoinCount(player, g, 1);
-                    game.changeGemBankCoinCount(g, -1);
+                    if (game.getCoins().contains(g)) {
+                        this.changePlayerCoinCount(player, g, 1);
+                        game.changeGemBankCoinCount(g, -1);
+                    } else {
+                        log.warn("player {} tried to take a nonexistent {} from the bank. REFUSED.", player.getMyCounter(), g);
+                    }
                 }
             }
         }
